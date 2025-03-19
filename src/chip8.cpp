@@ -17,24 +17,44 @@ uint8_t get_rand() {
 
 void Chip8::initialize() 
 {
-//   pc     = 0x200;  // Program counter starts at 0x200
-//   opcode = 0;      // Reset current opcode	
-//   I      = 0;      // Reset index register
-//   sp     = 0;      // Reset stack pointer
- 
-  // Clear display	
-  // Clear stack
-  // Clear registers V0-VF
-  // Clear memory
+    pc     = 0x200;  // Program counter starts at 0x200
+    opcode = 0;      // Reset current opcode    
+    I      = 0;      // Reset index register
+    sp     = 0;      // Reset stack pointer
 
-  // Load fontset
-  // In the article its 0 to 80
-  for (int i = 0x050; i < 0x0A0; ++i)
-  {
-    // memory[i] = chip8_fontset[i - 0x050];
-  }
+    // Clear display
+    for (auto& pixel : gfx)
+    {
+        pixel = 0;
+    }
+    // Clear stack
+    // Clear registers V0-VF
+    assert(stack.size() == key.size());
+    assert(stack.size() == V.size());
+    for (int i = 0; i < stack.size(); ++i)
+    {
+        stack[i] = 0;
+        key[i] = 0;
+        V[i] = 0;
+    }
+    // Clear memory
+    for (auto& b : memory)
+    {
+        b = 0;
+    }
 
-  // Reset timers
+    // Load fontset
+    // In the article its 0 to 80
+    for (int i = 0x050; i < 0x0A0; ++i)
+    {
+        memory[i] = chip8_fontset[i - 0x050];
+    }
+
+    // Reset timers
+    delay_timer = 0;
+    sound_timer = 0;
+
+    drawFlag = true;
 }
 
 void Chip8::emulateCycle()
@@ -45,6 +65,13 @@ void Chip8::emulateCycle()
     switch (opcode & 0xF000)
     {
     case 0x0000:
+        if ((opcode & 0x0F00) != 0)
+        {
+            std::println("Ignoring machine code call at address: {:03X}, chip8.cpp:{}",
+                opcode & 0x0FFF, __LINE__);
+            pc += 2;
+            break;
+        }
         switch (opcode & 0x00FF)
         {
         case 0x00E0:
@@ -53,16 +80,19 @@ void Chip8::emulateCycle()
             {
                 pixel = 0;
             }
+            drawFlag = true;
             pc += 2;
             break;
         case 0x00EE:
             // Returns from a subroutine.
-            // Anything else needed?
             sp--;
             pc = stack[sp];
+            // Increase the progam counter as we intend to execute the following insturction after returing
+            pc += 2;
             break;
         default:
-            std::println("Unknown opcode: {:X}", opcode);
+            std::println("Unknown opcode: {:X}, chip8.cpp:{}", opcode, __LINE__);
+            pc += 2;
             break;
         }
         break;
@@ -164,12 +194,13 @@ void Chip8::emulateCycle()
             auto vx = V[(opcode & 0x0F00) >> 8];
             V[(opcode & 0x0F00) >> 8] = vx << 1;
             // Check endianess
-            V[0xF] = (vx & 0x80) >> 7; // Get the most significant bit
+            V[0xF] = vx >> 7; // Get the most significant bit
             pc += 2;
             break;
         }
         default:
-            std::println("Unknown opcode: {:X}", opcode);
+            std::println("Unknown opcode: {:X}, chip8.cpp:{}", opcode, __LINE__);
+            pc += 2;
             break;
         }
         break;
@@ -236,7 +267,8 @@ void Chip8::emulateCycle()
             pc += (key[V[(opcode & 0x0F00) >> 8]] == 0) ? 4 : 2;
             break;
         default:
-            std::println("Unknown opcode: {:X}", opcode);
+            std::println("Unknown opcode: {:X}, chip8.cpp:{}", opcode, __LINE__);
+            pc += 2;
             break;
         }
         break;
@@ -249,12 +281,22 @@ void Chip8::emulateCycle()
             break;
         case 0x000A:
         {
-            // A key press is awaited, and then stored in VX 
-            // (blocking operation, all instruction halted until next key event,
-            // delay and sound timers should continue processing)
-            // How to simulate a key press?
-            // V[(opcode & 0x0F00) >> 8] = get_key();
-            std::println("Opcode not implemented: {:X}", opcode);
+            bool keyPress = false;
+
+            for (int i = 0; i < key.size(); ++i)
+            {
+                if (key[i] != 0)
+                {
+                    V[(opcode & 0x0F00) >> 8] = i;
+                    keyPress = true;
+                }
+            }
+
+            // Skip this cycle and try again until any key pressed
+            if (!keyPress)
+                return;
+
+            pc += 2;
             break;
         }
         case 0x0015:
@@ -267,14 +309,17 @@ void Chip8::emulateCycle()
             break;
         case 0x001E:
             I += V[(opcode & 0x0F00) >> 8];
+            // Was it on wiki as well?
+            V[0xF] = I > 0xFFF ? 1 : 0;
             pc += 2;
             break;
         case 0x0029:
-            // Non implemented
-            // Sets I to the location of the sprite for the character in VX(only consider the lowest nibble).
-            // Characters 0-F (in hexadecimal) are represented by a 4x5 font.[24]
-            // I = sprite_addr[Vx]
-            std::println("Opcode not implemented: {:X}", opcode);
+            // Each character sprite is 5 bytes long, 
+            // so this calculation gives the memory address of the sprite
+            // for the character stored in VX.
+            // We store characters starting at address 0x050
+            I = V[(opcode & 0x0F00) >> 8] * 5 + 0x050;
+            pc += 2;
             break;
         case 0x0033:
         {
@@ -286,33 +331,41 @@ void Chip8::emulateCycle()
         }
         case 0x0055:
         {
-            for (int i = 0; i < V.size(); ++i)
+            for (int i = 0; i < ((opcode & 0x0F00) >> 8); ++i)
             {
                 memory[I + i] = V[i];
             }
+            // On the original interpreter, when the operation is done, I = I + X + 1.
+            I += ((opcode & 0x0F00) >> 8) + 1;
+            pc += 2;
             break;
         }
         case 0x0065:
         {
-            for (int i = 0; i < V.size(); ++i)
+            for (int i = 0; i < ((opcode & 0x0F00) >> 8); ++i)
             {
                 V[i] = memory[I + i];
             }
+            // On the original interpreter, when the operation is done, I = I + X + 1.
+            I += ((opcode & 0x0F00) >> 8) + 1;
+            pc +=2 ;
             break;
         }     
         default:
-            std::println("Unknown opcode: {:X}", opcode);
+            std::println("Unknown opcode: {:X}, chip8.cpp:{}", opcode, __LINE__);
+            pc += 2;
             break;
         }
         break;    
     default:
-        std::println("Unknown opcode: {:X}", opcode);
+        std::println("Unknown opcode: {:X}, chip8.cpp:{}", opcode, __LINE__);
+        pc += 2;
         break;
     }
 
     if (delay_timer > 0)
     {
-        delay_timer--;
+        --delay_timer;
     }
 
     if (sound_timer > 0)
@@ -322,12 +375,37 @@ void Chip8::emulateCycle()
             std::println("BEEP!");
         }
 
-        sound_timer--;
+        --sound_timer;
     }
+}
+
+void Chip8::debugRender()
+{
+    for (int y = 0; y < SCREEN_HEIGHT; ++y)
+    {
+        for (int x = 0; x < SCREEN_WIDTH; ++x)
+        {
+            auto pixel_idx = (y * SCREEN_WIDTH) + x;
+            if (gfx[pixel_idx] == 0)
+            {
+                std::print("O");
+            }
+            else
+            {
+                std::print(" ");
+            }
+        }
+        std::print("\n");
+    }
+    std::print("\n");
 }
 
 void Chip8::loadGame(const std::string& name)
 {
+    initialize();
+
+    std::println("Loading: {}", name);
+
     constexpr auto maxBufferSize = 0xFFF - 0x200;
     std::fstream fs(name, std::ios::binary | std::ios::in | std::ios::ate);
 

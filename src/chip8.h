@@ -14,6 +14,7 @@ public:
     void loadGame(const std::string& name);
     void emulateCycle();
     void setKyes();
+    void debugRender();
 
 public:
     // The Chip 8 has 35 opcodes which are all two bytes long.
@@ -47,7 +48,7 @@ public:
     // +-+-+-+-+
     // |Z|X|C|V|
     // +-+-+-+-+
-    uint8_t key[16];
+    std::array<uint8_t, 16> key;
     bool drawFlag = false;
 
     std::array<uint8_t, 80> chip8_fontset =
