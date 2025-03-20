@@ -53,7 +53,6 @@ void Chip8::initialize()
     // Reset timers
     delay_timer = 0;
     sound_timer = 0;
-    real_time = std::chrono::high_resolution_clock::now();
 
     drawFlag = true;
 }
@@ -364,11 +363,7 @@ void Chip8::emulateCycle()
         break;
     }
 
-    auto prev_time = real_time;
-    real_time = std::chrono::high_resolution_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(real_time - prev_time);
-
-    if (elapsed.count() > 16) // Update every 16 ms ~ 60 Hz
+    if (updateTimers)
     {
         std::println("16ms ellapsed...");
         if (delay_timer > 0)
@@ -385,6 +380,8 @@ void Chip8::emulateCycle()
 
             --sound_timer;
         }
+
+        updateTimers = false;
     }
 }
 
@@ -440,4 +437,9 @@ void Chip8::loadGame(const std::string& name)
     {
         memory[i + 0x200] = buffer[i];
     }
+}
+
+void Chip8::setUpdateTimers()
+{
+    updateTimers = true;
 }

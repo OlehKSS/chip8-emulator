@@ -1,7 +1,6 @@
 #pragma once
 
 #include <array>
-#include <chrono>
 #include <string>
 #include <stdint.h>
 
@@ -14,7 +13,7 @@ public:
     void initialize();
     void loadGame(const std::string& name);
     void emulateCycle();
-    void setKyes();
+    void setUpdateTimers();
     void debugRender();
 
 public:
@@ -72,5 +71,5 @@ public:
         0xF0, 0x80, 0xF0, 0x80, 0x80  // F
     };
 
-    std::chrono::time_point<std::chrono::high_resolution_clock> real_time;
+    bool updateTimers = false;
 };

@@ -4,16 +4,13 @@ project(Chip8Emulators)
 
 set(CMAKE_CXX_STANDARD 23)
 
-find_package(OpenGL REQUIRED)
-find_package(GLUT REQUIRED)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
 
-add_executable(chip8emu)
+qt_standard_project_setup()
 
-target_include_directories(chip8emu PRIVATE 
-    src
-    ${OPENGL_INCLUDE_DIR} 
-    ${GLUT_INCLUDE_DIR}
-)
+qt_add_executable(chip8emu)
+
+target_include_directories(chip8emu PRIVATE src)
 
 target_sources(chip8emu PRIVATE
     src/main.cpp
@@ -21,4 +18,4 @@ target_sources(chip8emu PRIVATE
     src/chip8.cpp
 )
 
-target_link_libraries(chip8emu PRIVATE OpenGL::GL OpenGL::GLU GLUT::GLUT)
+target_link_libraries(chip8emu PRIVATE Qt::Core Qt::Widgets)
