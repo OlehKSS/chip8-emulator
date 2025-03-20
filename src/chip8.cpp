@@ -53,6 +53,7 @@ void Chip8::initialize()
     // Reset timers
     delay_timer = 0;
     sound_timer = 0;
+    real_time = std::chrono::high_resolution_clock::now();
 
     drawFlag = true;
 }
@@ -363,19 +364,27 @@ void Chip8::emulateCycle()
         break;
     }
 
-    if (delay_timer > 0)
-    {
-        --delay_timer;
-    }
+    auto prev_time = real_time;
+    real_time = std::chrono::high_resolution_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(real_time - prev_time);
 
-    if (sound_timer > 0)
+    if (elapsed.count() > 16) // Update every 16 ms ~ 60 Hz
     {
-        if (sound_timer == 1)
+        std::println("16ms ellapsed...");
+        if (delay_timer > 0)
         {
-            std::println("BEEP!");
+            --delay_timer;
         }
 
-        --sound_timer;
+        if (sound_timer > 0)
+        {
+            if (sound_timer == 1)
+            {
+                std::println("BEEP!");
+            }
+
+            --sound_timer;
+        }
     }
 }
 

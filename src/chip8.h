@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <chrono>
 #include <string>
 #include <stdint.h>
 
@@ -70,4 +71,6 @@ public:
         0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
         0xF0, 0x80, 0xF0, 0x80, 0x80  // F
     };
+
+    std::chrono::time_point<std::chrono::high_resolution_clock> real_time;
 };
