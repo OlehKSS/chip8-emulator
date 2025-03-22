@@ -1,5 +1,6 @@
 #include <print>
 #include <QApplication>
+#include <QImage>
 #include <QWidget>
 #include <QKeyEvent>
 #include <QPainter>
@@ -52,6 +53,7 @@ public:
 		: QWidget(parent) 
 	{
 		setFixedSize(Chip8::SCREEN_WIDTH * modifier, Chip8::SCREEN_HEIGHT * modifier);
+		screen = QImage(Chip8::SCREEN_WIDTH, Chip8::SCREEN_HEIGHT,  QImage::Format_RGB32);
 		emulationThread = new EmulationThread(&myChip8, this);
 		timer = new QTimer(this);
 		connect(timer, &QTimer::timeout, this, &Chip8Widget::setUpdateTimers);
@@ -89,15 +91,15 @@ protected:
 			{
 				if (myChip8.gfx[(y * Chip8::SCREEN_WIDTH) + x] == 0) 
 				{
-					painter.setBrush(Qt::black);
+					screen.setPixel(x, y, qRgb(0, 0, 0));
 				} 
 				else 
 				{
-					painter.setBrush(Qt::white);
+					screen.setPixel(x, y, qRgb(0, 255, 0));
 				}
-				painter.drawRect(x * modifier, y * modifier, modifier, modifier);
 			}
 		}
+		painter.drawImage(0, 0, screen.scaled(Chip8::SCREEN_WIDTH * modifier, Chip8::SCREEN_HEIGHT * modifier));
 	}
 
 	void keyPressEvent(QKeyEvent *event) override 
@@ -160,7 +162,7 @@ private slots:
 
 private:
 	Chip8 myChip8;
-
+	QImage screen;
 	EmulationThread *emulationThread;
 	QTimer *timer;
 	int modifier = 15;
