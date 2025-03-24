@@ -365,7 +365,6 @@ void Chip8::emulateCycle()
 
     if (updateTimers)
     {
-        std::println("16ms ellapsed...");
         if (delay_timer > 0)
         {
             --delay_timer;

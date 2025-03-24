@@ -34,6 +34,9 @@ protected:
 				emit updateScreen();
 				chip8->drawFlag = false;
 			}
+			// Delay to simulate the speed of a typical CHIP-8 processor
+			// Othewise keyboard release event is too slow
+			QThread::msleep(1);
 		}
 	}
 
